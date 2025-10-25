@@ -284,28 +284,29 @@ Instructions:
         {
             var results = new List<SchedulingResult>();
             var currentTime = 0;
-            var remainingProcesses = processes.ToList();
             
+            var remainingProcesses = processes.ToList();
+
             while (remainingProcesses.Count > 0)
             {
                 // Get processes that have arrived by current time
                 var availableProcesses = remainingProcesses.Where(p => p.ArrivalTime <= currentTime).ToList();
-                
+
                 if (availableProcesses.Count == 0)
                 {
                     // No process has arrived yet, jump to next arrival time
                     currentTime = remainingProcesses.Min(p => p.ArrivalTime);
                     continue;
                 }
-                
+
                 // Select process with shortest burst time
                 var nextProcess = availableProcesses.OrderBy(p => p.BurstTime).ThenBy(p => p.ArrivalTime).First();
-                
+
                 var startTime = Math.Max(currentTime, nextProcess.ArrivalTime);
                 var finishTime = startTime + nextProcess.BurstTime;
                 var waitingTime = startTime - nextProcess.ArrivalTime;
                 var turnaroundTime = finishTime - nextProcess.ArrivalTime;
-                
+
                 results.Add(new SchedulingResult
                 {
                     ProcessID = nextProcess.ProcessID,
@@ -316,11 +317,141 @@ Instructions:
                     WaitingTime = waitingTime,
                     TurnaroundTime = turnaroundTime
                 });
-                
+
                 currentTime = finishTime;
                 remainingProcesses.Remove(nextProcess);
             }
-            
+
+            return results.OrderBy(r => r.StartTime).ToList();
+        }
+
+        private List<SchedulingResult> RunSRTFAlgorithm(List<ProcessData> processes)
+        {
+            var results = new List<SchedulingResult>();
+            var currentTime = 0;
+            var remainingProcesses = processes.ToList();
+            var remainingTime = new Dictionary<string, int>();
+            var startTime = new Dictionary<string, int>();
+
+            //Initialize remaining time dictionary with process burst times
+            for(int i = 0; i < processes.Count(); i++)
+            {
+                remainingTime.Add(processes[i].ProcessID, processes[i].BurstTime);
+            }
+
+            while (remainingProcesses.Count > 0)
+            {
+                // Get processes that have arrived by current time
+                var availableProcesses = remainingProcesses.Where(p => p.ArrivalTime <= currentTime).ToList();
+
+                if (availableProcesses.Count == 0)
+                {
+                    // No process has arrived yet, jump to next arrival time
+                    currentTime = remainingProcesses.Min(p => p.ArrivalTime);
+                    continue;
+                }
+
+                // Select process with shortest remaining time
+                var nextProcess = availableProcesses.OrderBy(p => remainingTime[p.ProcessID]).ThenBy(p => p.ArrivalTime).First();
+
+                if (!startTime.ContainsKey(nextProcess.ProcessID))
+                {
+                    startTime.Add(nextProcess.ProcessID, currentTime);
+                }
+
+                remainingTime[nextProcess.ProcessID]--;
+                currentTime++;
+
+                if (remainingTime[nextProcess.ProcessID] == 0)
+                {
+                    var finishTime = currentTime;
+                    var turnaroundTime = finishTime - nextProcess.ArrivalTime;
+                    var waitingTime = turnaroundTime - nextProcess.BurstTime;
+                    
+
+                    results.Add(new SchedulingResult
+                    {
+                        ProcessID = nextProcess.ProcessID,
+                        ArrivalTime = nextProcess.ArrivalTime,
+                        BurstTime = nextProcess.BurstTime,
+                        StartTime = startTime[nextProcess.ProcessID],
+                        FinishTime = finishTime,
+                        WaitingTime = waitingTime,
+                        TurnaroundTime = turnaroundTime
+                    });
+                    remainingProcesses.Remove(nextProcess);
+                }
+      
+            }
+
+            return results.OrderBy(r => r.StartTime).ToList();
+        }
+        
+         private List<SchedulingResult> RunLotteryAlgorithm(List<ProcessData> processes)
+        {
+            var results = new List<SchedulingResult>();
+            var currentTime = 0;
+            var remainingProcesses = processes.ToList();
+            var processTickets = new Dictionary<string, int>();
+            var ticketPool = new List<string>();
+            Random rand = new Random();
+
+            //Each process gets 15 times its priority, tickets
+            for(int i = 0;i < processes.Count(); i++)
+            {
+                processTickets.Add(processes[i].ProcessID, processes[i].Priority*15);
+            }
+
+            //Add all of the tickets into the lottery pool
+            for(int i = 0;i < processes.Count(); i++)
+            {
+                string proc = processes[i].ProcessID;
+
+                for(int j = 0;j < processTickets[proc]; j++)
+                {
+                    ticketPool.Add(proc);
+                }
+            }
+
+            while (remainingProcesses.Count > 0)
+            {
+                // Get processes that have arrived by current time
+                var availableProcesses = remainingProcesses.Where(p => p.ArrivalTime <= currentTime).ToList();
+
+                if (availableProcesses.Count == 0)
+                {
+                    // No process has arrived yet, jump to next arrival time
+                    currentTime = remainingProcesses.Min(p => p.ArrivalTime);
+                    continue;
+                }
+
+                // Draw a process ID from the lottery pool
+                string winningProcess = ticketPool[rand.Next(ticketPool.Count)];
+                var nextProcess = remainingProcesses.First(p => p.ProcessID == winningProcess);
+
+                //Remove all of the winning processes tickets from the pool
+                ticketPool.RemoveAll(p => p.Equals(winningProcess));
+
+                var startTime = Math.Max(currentTime, nextProcess.ArrivalTime);
+                var finishTime = startTime + nextProcess.BurstTime;
+                var waitingTime = startTime - nextProcess.ArrivalTime;
+                var turnaroundTime = finishTime - nextProcess.ArrivalTime;
+
+                results.Add(new SchedulingResult
+                {
+                    ProcessID = nextProcess.ProcessID,
+                    ArrivalTime = nextProcess.ArrivalTime,
+                    BurstTime = nextProcess.BurstTime,
+                    StartTime = startTime,
+                    FinishTime = finishTime,
+                    WaitingTime = waitingTime,
+                    TurnaroundTime = turnaroundTime
+                });
+
+                currentTime = finishTime;
+                remainingProcesses.Remove(nextProcess);
+            }
+
             return results.OrderBy(r => r.StartTime).ToList();
         }
 
@@ -511,14 +642,20 @@ Instructions:
             // Add summary statistics
             var avgWaiting = results.Average(r => r.WaitingTime);
             var avgTurnaround = results.Average(r => r.TurnaroundTime);
+
+            double totalTime = results.Max(r => r.FinishTime);
+            double totalBurst = results.Sum(r => r.BurstTime);
+
+            double cpuUtilization = (totalBurst / totalTime) * 100.0;
+            double throughput = results.Count / totalTime;
             
             var summaryItem = new ListViewItem("SUMMARY");
             summaryItem.SubItems.Add(algorithmName);
             summaryItem.SubItems.Add($"{results.Count} processes");
             summaryItem.SubItems.Add($"Avg Wait: {avgWaiting:F1}");
             summaryItem.SubItems.Add($"Avg Turn: {avgTurnaround:F1}");
-            summaryItem.SubItems.Add("");
-            summaryItem.SubItems.Add("");
+            summaryItem.SubItems.Add($"CPU Utilization (%): {cpuUtilization:F1}");
+            summaryItem.SubItems.Add($"Throughput: {throughput:F1}");
             listView1.Items.Add(summaryItem);
 
             // TODO: STUDENTS - Add performance metrics calculation and display here
@@ -739,6 +876,50 @@ Instructions:
             }
         }
 
+        private void SaveResults_Click(object sender, EventArgs e)
+        {
+            if (listView1.Items.Count == 0)
+            {
+                MessageBox.Show("No result data to save. Please run an algorithm first.",
+                    "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var saveDialog = new SaveFileDialog())
+            {
+                saveDialog.Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*";
+                saveDialog.DefaultExt = "csv";
+                saveDialog.FileName = "ResultsData.csv";
+                saveDialog.Title = "Save Results Data";
+
+                if (saveDialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        using (var writer = new System.IO.StreamWriter(saveDialog.FileName))
+                        {
+                            // Write header
+                            writer.WriteLine("Process ID,Arrival, Burst, Start, Finish, Waiting, Turnaround");
+
+                            // Write data rows
+                            foreach (ListViewItem item in listView1.Items)
+                            {
+                                writer.WriteLine($"{item.SubItems[0].Text},{item.SubItems[1].Text},{item.SubItems[2].Text},{item.SubItems[3].Text},{item.SubItems[4].Text},{item.SubItems[5].Text},{item.SubItems[6].Text}");
+                            }
+                        }
+
+                        MessageBox.Show($"Process data saved successfully to:\n{saveDialog.FileName}",
+                            "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error saving file: {ex.Message}",
+                            "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
         /// <summary>
         /// STUDENTS: Loads process data from CSV file for testing custom datasets
         /// This allows you to prepare complex test scenarios in Excel/CSV editors
@@ -901,6 +1082,53 @@ Instructions:
             }
         }
 
+        private void ShortestRemainingTimeFirstButton_Click(object sender, EventArgs e)
+        {
+            var processData = GetProcessDataFromGrid();
+            if (processData.Count > 0)
+            {
+                // STUDENTS: Updated implementation using DataGrid data
+                var results = RunSRTFAlgorithm(processData);
+
+                // Update Results tab with detailed scheduling results
+                DisplaySchedulingResults(results, "SRTF - Shortest Remaining Time First");
+
+                // Switch to Results panel and update sidebar
+                ShowPanel(resultsPanel);
+                sidePanel.Height = btnDashBoard.Height;
+                sidePanel.Top = btnDashBoard.Top;
+            }
+            else
+            {
+                MessageBox.Show("Please set process count and ensure the data grid has process data.",
+                    "No Process Data", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtProcess.Focus();
+            }
+        }
+        
+        private void LotteryButton_Click(object sender, EventArgs e)
+        {
+            var processData = GetProcessDataFromGrid();
+            if (processData.Count > 0)
+            {
+                // STUDENTS: Updated implementation using DataGrid data
+                var results = RunLotteryAlgorithm(processData);
+
+                // Update Results tab with detailed scheduling results
+                DisplaySchedulingResults(results, "Lottery");
+                
+                // Switch to Results panel and update sidebar
+                ShowPanel(resultsPanel);
+                sidePanel.Height = btnDashBoard.Height;
+                sidePanel.Top = btnDashBoard.Top;
+            }
+            else
+            {
+                MessageBox.Show("Please set process count and ensure the data grid has process data.", 
+                    "No Process Data", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                txtProcess.Focus();
+            }
+        }
         /// <summary>
         /// Executes the Priority algorithm using DataGrid data.
         /// STUDENTS: Updated to use GetProcessDataFromGrid() instead of prompts
@@ -916,7 +1144,7 @@ Instructions:
 
                 // Update Results tab with detailed scheduling results
                 DisplaySchedulingResults(results, "Priority Scheduling (Higher # = Higher Priority)");
-                
+
                 // Switch to Results panel and update sidebar
                 ShowPanel(resultsPanel);
                 sidePanel.Height = btnDashBoard.Height;
@@ -924,7 +1152,7 @@ Instructions:
             }
             else
             {
-                MessageBox.Show("Please set process count and ensure the data grid has process data.", 
+                MessageBox.Show("Please set process count and ensure the data grid has process data.",
                     "No Process Data", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtProcess.Focus();
             }
@@ -1006,6 +1234,8 @@ Instructions:
             ApplyRoundedCorners(btnPriority);
             ApplyRoundedCorners(btnRoundRobin);
             ApplyRoundedCorners(btnDarkModeToggle);
+            ApplyRoundedCorners(btnSRTF);
+            ApplyRoundedCorners(btnLottery);
             
             // Apply default dark theme
             ApplyTheme();
@@ -1072,6 +1302,7 @@ Instructions:
             ApplyDarkThemeToButton(btnWelcome);
             ApplyDarkThemeToButton(btnCpuScheduler);
             ApplyDarkThemeToButton(btnDashBoard);
+            ApplyDarkThemeToButton(btnSaveResults);
             ApplyDarkThemeToButton(btnAbout);
             ApplyDarkThemeToButton(btnDarkModeToggle);
             
@@ -1126,6 +1357,8 @@ Instructions:
             ApplyDarkThemeToSchedulerButton(btnSJF);
             ApplyDarkThemeToSchedulerButton(btnPriority);
             ApplyDarkThemeToSchedulerButton(btnRoundRobin);
+            ApplyDarkThemeToSchedulerButton(btnSRTF);
+            ApplyDarkThemeToSchedulerButton(btnLottery);
         }
 
         /// <summary>
@@ -1144,6 +1377,7 @@ Instructions:
             ApplyLightThemeToButton(btnWelcome);
             ApplyLightThemeToButton(btnCpuScheduler);
             ApplyLightThemeToButton(btnDashBoard);
+            ApplyLightThemeToButton(btnSaveResults);
             ApplyLightThemeToButton(btnAbout);
             ApplyLightThemeToButton(btnDarkModeToggle);
             
@@ -1200,12 +1434,16 @@ Instructions:
             btnSJF.BackColor = Color.AntiqueWhite;
             btnPriority.BackColor = Color.Bisque;
             btnRoundRobin.BackColor = Color.PapayaWhip;
+            btnSRTF.BackColor = Color.Beige;
+            btnLottery.BackColor = Color.Bisque;
             
             // Reset text color for algorithm buttons
             btnFCFS.ForeColor = SystemColors.ControlText;
             btnSJF.ForeColor = SystemColors.ControlText;
             btnPriority.ForeColor = SystemColors.ControlText;
             btnRoundRobin.ForeColor = SystemColors.ControlText;
+            btnSRTF.ForeColor = SystemColors.ControlText;
+            btnLottery.ForeColor = SystemColors.ControlText;
         }
 
         /// <summary>
