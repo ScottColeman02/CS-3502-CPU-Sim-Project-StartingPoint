@@ -260,37 +260,6 @@
             this.welcomeTextBox.TabIndex = 0;
             this.welcomeTextBox.Text = "";
             // 
-            // resultsPanel
-            // 
-            this.resultsPanel.BackColor = System.Drawing.SystemColors.Control;
-            this.resultsPanel.Controls.Add(this.listView1);
-            this.resultsPanel.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.resultsPanel.Location = new System.Drawing.Point(0, 0);
-            this.resultsPanel.Name = "resultsPanel";
-            this.resultsPanel.Padding = new System.Windows.Forms.Padding(10);
-            this.resultsPanel.Size = new System.Drawing.Size(728, 600);
-            this.resultsPanel.TabIndex = 0;
-            this.resultsPanel.Visible = true;
-            // 
-            // listView1
-            // 
-            this.listView1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.listView1.BackColor = System.Drawing.SystemColors.Window;
-            this.listView1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.listView1.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.listView1.FullRowSelect = true;
-            this.listView1.GridLines = true;
-            this.listView1.HideSelection = false;
-            this.listView1.Location = new System.Drawing.Point(10, 10);
-            this.listView1.Name = "listView1";
-            this.listView1.Size = new System.Drawing.Size(700, 570);
-            this.listView1.TabIndex = 10;
-            this.listView1.UseCompatibleStateImageBehavior = false;
-            this.listView1.View = System.Windows.Forms.View.Details;
-            // 
-            // 
             // schedulerPanel
             // 
             this.schedulerPanel.BackColor = System.Drawing.SystemColors.Control;
